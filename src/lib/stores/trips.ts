@@ -1,136 +1,134 @@
-import { writable } from 'svelte/store';
+/**
+ * Trip store - simplified for server-side data loading pattern.
+ * 
+ * Note: With SvelteKit's load functions, most data is now loaded server-side
+ * and passed through PageData. This store is kept for client-side operations
+ * that need to update data after mutations.
+ */
+
 import { supabase } from '$lib/utils/supabase';
-import type { Trip, Receipt, TripWithReceipts } from '$lib/types';
+import type { Trip, Receipt } from '$lib/types';
 
-export const trips = writable<Trip[]>([]);
-export const currentTrip = writable<TripWithReceipts | null>(null);
-export const loading = writable<boolean>(false);
-export const error = writable<string | null>(null);
-
-export async function loadTrips() {
-	loading.set(true);
-	error.set(null);
+/**
+ * Creates a new trip in the database.
+ * Consider using form actions instead for better UX.
+ */
+export async function createTrip(
+	trip: Omit<Trip, 'id' | 'created_at' | 'user_id'>
+): Promise<Trip> {
+	const {
+		data: { user }
+	} = await supabase.auth.getUser();
 	
-	try {
-		const { data, error: err } = await supabase
-			.from('trips')
-			.select('*')
-			.order('created_at', { ascending: false });
-		
-		if (err) throw err;
-		
-		trips.set(data || []);
-	} catch (e) {
-		error.set(e instanceof Error ? e.message : 'Failed to load trips');
-		console.error('Error loading trips:', e);
-	} finally {
-		loading.set(false);
-	}
+	if (!user) throw new Error('Not authenticated');
+
+	const { data, error } = await supabase
+		.from('trips')
+		.insert({
+			...trip,
+			user_id: user.id
+		})
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data as Trip;
 }
 
-export async function createTrip(trip: Omit<Trip, 'id' | 'created_at' | 'user_id'>) {
-	loading.set(true);
-	error.set(null);
+/**
+ * Creates a new receipt in the database.
+ */
+export async function createReceipt(
+	receipt: Omit<Receipt, 'id' | 'created_at' | 'user_id'>
+): Promise<Receipt> {
+	const {
+		data: { user }
+	} = await supabase.auth.getUser();
 	
-	try {
-		const { data: { user } } = await supabase.auth.getUser();
-		if (!user) throw new Error('Not authenticated');
-		
-		const { data, error: err } = await supabase
-			.from('trips')
-			.insert({
-				...trip,
-				user_id: user.id
-			})
-			.select()
-			.single();
-		
-		if (err) throw err;
-		
-		trips.update(t => [data, ...t]);
-		return data;
-	} catch (e) {
-		error.set(e instanceof Error ? e.message : 'Failed to create trip');
-		console.error('Error creating trip:', e);
-		throw e;
-	} finally {
-		loading.set(false);
-	}
+	if (!user) throw new Error('Not authenticated');
+
+	const { data, error } = await supabase
+		.from('receipts')
+		.insert({
+			...receipt,
+			user_id: user.id,
+			currency: receipt.currency || 'USD'
+		})
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data as Receipt;
 }
 
-export async function loadTripWithReceipts(tripId: string) {
-	loading.set(true);
-	error.set(null);
+/**
+ * Updates an existing trip in the database.
+ */
+export async function updateTrip(
+	tripId: string,
+	updates: Partial<Omit<Trip, 'id' | 'created_at' | 'user_id'>>
+): Promise<Trip> {
+	const {
+		data: { user }
+	} = await supabase.auth.getUser();
 	
-	try {
-		const { data: tripData, error: tripErr } = await supabase
-			.from('trips')
-			.select('*')
-			.eq('id', tripId)
-			.single();
-		
-		if (tripErr) throw tripErr;
-		
-		const { data: receiptsData, error: receiptsErr } = await supabase
-			.from('receipts')
-			.select('*')
-			.eq('trip_id', tripId)
-			.order('date', { ascending: false });
-		
-		if (receiptsErr) throw receiptsErr;
-		
-		if (tripData) {
-			currentTrip.set({
-				...tripData,
-				receipts: (receiptsData || []) as Receipt[]
-			});
-		}
-	} catch (e) {
-		error.set(e instanceof Error ? e.message : 'Failed to load trip');
-		console.error('Error loading trip:', e);
-	} finally {
-		loading.set(false);
-	}
+	if (!user) throw new Error('Not authenticated');
+
+	const { data, error } = await supabase
+		.from('trips')
+		.update(updates)
+		.eq('id', tripId)
+		.eq('user_id', user.id)
+		.select()
+		.single();
+
+	if (error) throw error;
+	return data as Trip;
 }
 
-export async function createReceipt(receipt: Omit<Receipt, 'id' | 'created_at' | 'user_id'>) {
-	loading.set(true);
-	error.set(null);
+/**
+ * Deletes a trip and all associated receipts.
+ */
+export async function deleteTrip(tripId: string): Promise<void> {
+	const {
+		data: { user }
+	} = await supabase.auth.getUser();
 	
-	try {
-		const { data: { user } } = await supabase.auth.getUser();
-		if (!user) throw new Error('Not authenticated');
-		
-		const { data, error: err } = await supabase
-			.from('receipts')
-			.insert({
-				...receipt,
-				user_id: user.id,
-				currency: receipt.currency || 'USD'
-			})
-			.select()
-			.single();
-		
-		if (err) throw err;
-		
-		// Update current trip if it's loaded
-		currentTrip.update(trip => {
-			if (trip && trip.id === receipt.trip_id) {
-				return {
-					...trip,
-					receipts: [data, ...(trip.receipts || [])]
-				};
-			}
-			return trip;
-		});
-		
-		return data;
-	} catch (e) {
-		error.set(e instanceof Error ? e.message : 'Failed to create receipt');
-		console.error('Error creating receipt:', e);
-		throw e;
-	} finally {
-		loading.set(false);
-	}
+	if (!user) throw new Error('Not authenticated');
+
+	// First delete all receipts
+	const { error: receiptsError } = await supabase
+		.from('receipts')
+		.delete()
+		.eq('trip_id', tripId);
+
+	if (receiptsError) throw receiptsError;
+
+	// Then delete the trip
+	const { error: tripError } = await supabase
+		.from('trips')
+		.delete()
+		.eq('id', tripId)
+		.eq('user_id', user.id);
+
+	if (tripError) throw tripError;
 }
 
+/**
+ * Deletes a receipt.
+ */
+export async function deleteReceipt(receiptId: string): Promise<void> {
+	const {
+		data: { user }
+	} = await supabase.auth.getUser();
+	
+	if (!user) throw new Error('Not authenticated');
+
+	const { error } = await supabase
+		.from('receipts')
+		.delete()
+		.eq('id', receiptId)
+		.eq('user_id', user.id);
+
+	if (error) throw error;
+}

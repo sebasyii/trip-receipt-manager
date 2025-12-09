@@ -1,76 +1,43 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button";
-	import { Input } from "$lib/components/ui/input";
-	import { Label } from "$lib/components/ui/label";
-	import { Card, CardHeader, CardTitle, CardContent } from "$lib/components/ui/card";
-	import { supabase } from "$lib/utils/supabase";
-	import { goto } from "$app/navigation";
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
+	import { enhance } from '$app/forms';
+	import { goto } from '$app/navigation';
 
-	let email = $state("");
-	let password = $state("");
-	let confirmPassword = $state("");
+	let { form } = $props();
+
 	let loading = $state(false);
-	let error = $state<string | null>(null);
-	let message = $state<string | null>(null);
-
-	async function handleSignup() {
-		if (!email || !password || !confirmPassword) {
-			error = "All fields are required";
-			return;
-		}
-
-		if (password !== confirmPassword) {
-			error = "Passwords do not match";
-			return;
-		}
-
-		if (password.length < 6) {
-			error = "Password must be at least 6 characters";
-			return;
-		}
-
-		loading = true;
-		error = null;
-		message = null;
-
-		try {
-			const { error: signUpError } = await supabase.auth.signUp({
-				email,
-				password
-			});
-
-			if (signUpError) throw signUpError;
-
-			message = "Account created! Please check your email to confirm your account, then login.";
-			
-			// Clear form
-			email = "";
-			password = "";
-			confirmPassword = "";
-		} catch (e) {
-			error = e instanceof Error ? e.message : "Failed to sign up";
-		} finally {
-			loading = false;
-		}
-	}
 </script>
 
-<div class="container mx-auto py-8 px-4 max-w-md">
-	<Card>
-		<CardHeader>
-			<CardTitle>Sign Up</CardTitle>
+<div class="min-h-screen flex items-center justify-center px-4">
+	<Card class="w-full max-w-md">
+		<CardHeader class="text-center">
+			<CardTitle class="text-2xl">Create Account</CardTitle>
+			<p class="text-sm text-muted-foreground mt-2">Start managing your trip receipts today</p>
 		</CardHeader>
 		<CardContent>
-			<form onsubmit={(e) => { e.preventDefault(); handleSignup(); }} class="space-y-4">
-				{#if error}
+			<form
+				method="POST"
+				use:enhance={() => {
+					loading = true;
+					return async ({ update }) => {
+						loading = false;
+						await update();
+					};
+				}}
+				class="space-y-4"
+			>
+				{#if form?.error}
 					<div class="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-						{error}
+						{form.error}
 					</div>
 				{/if}
 
-				{#if message}
-					<div class="p-3 text-sm text-green-700 bg-green-100 rounded-md">
-						{message}
+				{#if form?.success}
+					<div class="p-3 text-sm text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 rounded-md">
+						{form.message}
 					</div>
 				{/if}
 
@@ -78,10 +45,12 @@
 					<Label for="email">Email</Label>
 					<Input
 						id="email"
+						name="email"
 						type="email"
-						bind:value={email}
+						value={form?.email ?? ''}
 						placeholder="you@example.com"
 						required
+						autocomplete="email"
 					/>
 				</div>
 
@@ -89,34 +58,36 @@
 					<Label for="password">Password</Label>
 					<Input
 						id="password"
+						name="password"
 						type="password"
-						bind:value={password}
 						placeholder="••••••••"
 						required
+						autocomplete="new-password"
 					/>
+					<p class="text-xs text-muted-foreground">Must be at least 6 characters</p>
 				</div>
 
 				<div class="space-y-2">
-					<Label for="confirm-password">Confirm Password</Label>
+					<Label for="confirmPassword">Confirm Password</Label>
 					<Input
-						id="confirm-password"
+						id="confirmPassword"
+						name="confirmPassword"
 						type="password"
-						bind:value={confirmPassword}
 						placeholder="••••••••"
 						required
+						autocomplete="new-password"
 					/>
 				</div>
 
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2 pt-2">
 					<Button type="submit" disabled={loading} class="w-full">
-						{loading ? "Creating account..." : "Sign Up"}
+						{loading ? 'Creating account...' : 'Sign Up'}
 					</Button>
-					<Button type="button" variant="outline" onclick={() => goto("/login")} class="w-full">
-						Already have an account? Login
+					<Button type="button" variant="outline" onclick={() => goto('/login')} class="w-full">
+						Already have an account? Sign in
 					</Button>
 				</div>
 			</form>
 		</CardContent>
 	</Card>
 </div>
-

@@ -1,52 +1,37 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button";
-	import { Input } from "$lib/components/ui/input";
-	import { Label } from "$lib/components/ui/label";
-	import { Card, CardHeader, CardTitle, CardContent } from "$lib/components/ui/card";
-	import { supabase } from "$lib/utils/supabase";
-	import { goto } from "$app/navigation";
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
+	import { enhance } from '$app/forms';
+	import { goto } from '$app/navigation';
 
-	let email = $state("");
-	let password = $state("");
+	let { form } = $props();
+
 	let loading = $state(false);
-	let error = $state<string | null>(null);
-
-	async function handleLogin() {
-		if (!email || !password) {
-			error = "Email and password are required";
-			return;
-		}
-
-		loading = true;
-		error = null;
-
-		try {
-			const { error: signInError } = await supabase.auth.signInWithPassword({
-				email,
-				password
-			});
-
-			if (signInError) throw signInError;
-
-			goto("/");
-		} catch (e) {
-			error = e instanceof Error ? e.message : "Failed to login";
-		} finally {
-			loading = false;
-		}
-	}
 </script>
 
-<div class="container mx-auto py-8 px-4 max-w-md">
-	<Card>
-		<CardHeader>
-			<CardTitle>Login</CardTitle>
+<div class="min-h-screen flex items-center justify-center px-4">
+	<Card class="w-full max-w-md">
+		<CardHeader class="text-center">
+			<CardTitle class="text-2xl">Welcome Back</CardTitle>
+			<p class="text-sm text-muted-foreground mt-2">Sign in to manage your trip receipts</p>
 		</CardHeader>
 		<CardContent>
-			<form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="space-y-4">
-				{#if error}
+			<form
+				method="POST"
+				use:enhance={() => {
+					loading = true;
+					return async ({ update }) => {
+						loading = false;
+						await update();
+					};
+				}}
+				class="space-y-4"
+			>
+				{#if form?.error}
 					<div class="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-						{error}
+						{form.error}
 					</div>
 				{/if}
 
@@ -54,10 +39,12 @@
 					<Label for="email">Email</Label>
 					<Input
 						id="email"
+						name="email"
 						type="email"
-						bind:value={email}
+						value={form?.email ?? ''}
 						placeholder="you@example.com"
 						required
+						autocomplete="email"
 					/>
 				</div>
 
@@ -65,18 +52,19 @@
 					<Label for="password">Password</Label>
 					<Input
 						id="password"
+						name="password"
 						type="password"
-						bind:value={password}
 						placeholder="••••••••"
 						required
+						autocomplete="current-password"
 					/>
 				</div>
 
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2 pt-2">
 					<Button type="submit" disabled={loading} class="w-full">
-						{loading ? "Logging in..." : "Login"}
+						{loading ? 'Signing in...' : 'Sign In'}
 					</Button>
-					<Button type="button" variant="outline" onclick={() => goto("/signup")} class="w-full">
+					<Button type="button" variant="outline" onclick={() => goto('/signup')} class="w-full">
 						Don't have an account? Sign up
 					</Button>
 				</div>
@@ -84,4 +72,3 @@
 		</CardContent>
 	</Card>
 </div>
-

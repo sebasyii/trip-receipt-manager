@@ -7,8 +7,6 @@ const openai = new OpenAI({
 	apiKey: OPENAI_API_KEY || ''
 });
 
-console.log(openai.apiKey);
-
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const { image } = await request.json();
@@ -17,7 +15,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ success: false, error: 'No image provided' }, { status: 400 });
 		}
 
-		if (!openai.apiKey) {
+		if (!OPENAI_API_KEY) {
 			return json({ success: false, error: 'OpenAI API key not configured' }, { status: 500 });
 		}
 
@@ -59,7 +57,7 @@ If you cannot determine a value with confidence, use null for that field and set
 		});
 
 		const content = response.choices[0]?.message?.content;
-		
+
 		if (!content) {
 			return json({ success: false, error: 'No response from AI' }, { status: 500 });
 		}
@@ -70,19 +68,22 @@ If you cannot determine a value with confidence, use null for that field and set
 			// Remove any markdown code blocks if present
 			const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 			parsedData = JSON.parse(cleanContent);
-		} catch (e) {
+		} catch {
 			console.error('Failed to parse AI response:', content);
-			return json({ 
-				success: false, 
-				error: 'Failed to parse AI response' 
-			}, { status: 500 });
+			return json(
+				{
+					success: false,
+					error: 'Failed to parse AI response'
+				},
+				{ status: 500 }
+			);
 		}
 
 		return json({
 			success: true,
 			data: {
 				date: parsedData.date || new Date().toISOString().split('T')[0],
-				amount: parsedData.amount || null,
+				amount: parsedData.amount ?? null,
 				currency: parsedData.currency || 'USD',
 				description: parsedData.description || '',
 				confidence: parsedData.confidence || {}
@@ -99,4 +100,3 @@ If you cannot determine a value with confidence, use null for that field and set
 		);
 	}
 };
-

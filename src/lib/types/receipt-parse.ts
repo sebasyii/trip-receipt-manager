@@ -17,3 +17,4 @@ export interface ParseReceiptResponse {
 	error?: string;
 }
 
+

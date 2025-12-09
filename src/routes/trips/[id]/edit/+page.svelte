@@ -7,15 +7,21 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 
-	let { form } = $props();
+	let { data, form } = $props();
 
 	let submitting = $state(false);
+
+	// Format date for input (YYYY-MM-DD)
+	const formatDateForInput = (dateStr: string) => {
+		if (!dateStr) return '';
+		return dateStr.split('T')[0];
+	};
 </script>
 
 <div class="container mx-auto py-8 px-4 max-w-2xl">
 	<Card>
 		<CardHeader>
-			<CardTitle>Create New Trip</CardTitle>
+			<CardTitle>Edit Trip</CardTitle>
 		</CardHeader>
 		<CardContent>
 			<form
@@ -40,7 +46,7 @@
 					<Input
 						id="name"
 						name="name"
-						value={form?.name ?? ''}
+						value={form?.name ?? data.trip.name}
 						placeholder="e.g., Summer Vacation 2024"
 						required
 					/>
@@ -53,13 +59,18 @@
 							id="startDate"
 							name="startDate"
 							type="date"
-							value={form?.startDate ?? ''}
+							value={form?.startDate ?? formatDateForInput(data.trip.start_date)}
 							required
 						/>
 					</div>
 					<div class="space-y-2">
 						<Label for="endDate">End Date</Label>
-						<Input id="endDate" name="endDate" type="date" value={form?.endDate ?? ''} />
+						<Input
+							id="endDate"
+							name="endDate"
+							type="date"
+							value={form?.endDate ?? formatDateForInput(data.trip.end_date ?? '')}
+						/>
 					</div>
 				</div>
 
@@ -68,7 +79,7 @@
 					<Textarea
 						id="description"
 						name="description"
-						value={form?.description ?? ''}
+						value={form?.description ?? data.trip.description ?? ''}
 						placeholder="Optional trip description..."
 						rows={3}
 					/>
@@ -76,9 +87,15 @@
 
 				<div class="flex gap-2 pt-2">
 					<Button type="submit" disabled={submitting}>
-						{submitting ? 'Creating...' : 'Create Trip'}
+						{submitting ? 'Saving...' : 'Save Changes'}
 					</Button>
-					<Button type="button" variant="outline" onclick={() => goto('/')}>Cancel</Button>
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => goto(`/trips/${data.trip.id}`)}
+					>
+						Cancel
+					</Button>
 				</div>
 			</form>
 		</CardContent>
