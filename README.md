@@ -28,14 +28,17 @@ A Svelte application for managing receipts during trips, with cloud storage and 
    ```sh
    pnpm install
    ```
+   
+   Note: The project uses OpenAI for AI-powered receipt parsing. Make sure to get an API key from https://platform.openai.com/api-keys
 
 2. **Set up Supabase**:
    - Create a new Supabase project at [supabase.com](https://supabase.com)
    - Go to Settings > API to get your project URL and anon key
    - Create a `.env` file in the root directory:
      ```
-     PUBLIC_SUPABASE_URL=your_supabase_project_url
-     PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+     VITE_PUBLIC_SUPABASE_URL=your_supabase_project_url
+     VITE_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+     OPENAI_API_KEY=your_openai_api_key
      ```
 
 3. **Set up the database**:
@@ -162,11 +165,13 @@ pnpm dev -- --open
    - Click "New Trip" on the home page
    - Fill in trip details and click "Create Trip"
 
-3. **Adding receipts**:
+3. **Adding receipts** (with AI):
    - Click on a trip to view its details
    - Click "Add Receipt"
-   - Fill in receipt details and upload a file (image or PDF)
-   - Click "Add Receipt" to save
+   - Upload a receipt image (the AI will analyze it)
+   - Click "Analyze Receipt with AI"
+   - Review and edit the extracted information (date, amount, currency, description)
+   - Click "Looks Good - Save Receipt" to save
 
 4. **Viewing receipts**:
    - Receipts are automatically grouped by date

@@ -8,6 +8,7 @@
 	import { createReceipt } from "$lib/stores/trips";
 	import { supabase } from "$lib/utils/supabase";
 	import { goto } from "$app/navigation";
+	import type { ParsedReceiptData } from "$lib/types/receipt-parse";
 
 	let {
 		tripId
@@ -15,13 +16,72 @@
 		tripId: string;
 	} = $props();
 
+	// Step management
+	let step = $state<'upload' | 'review' | 'saving'>('upload');
+	
+	// Form data
 	let date = $state(new Date().toISOString().split('T')[0]);
 	let description = $state("");
 	let amount = $state("");
 	let currency = $state("USD");
 	let file = $state<File | null>(null);
+	let imagePreview = $state<string | null>(null);
+	
+	// State
+	let analyzing = $state(false);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
+
+	async function analyzeReceipt() {
+		if (!file) {
+			error = "Please upload a receipt first";
+			return;
+		}
+
+		analyzing = true;
+		error = null;
+
+		try {
+			// Convert file to base64
+			const reader = new FileReader();
+			const base64Promise = new Promise<string>((resolve, reject) => {
+				reader.onload = () => resolve(reader.result as string);
+				reader.onerror = reject;
+			});
+			reader.readAsDataURL(file);
+			const base64Image = await base64Promise;
+
+			// Call API to parse receipt
+			const response = await fetch('/api/parse-receipt', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ image: base64Image })
+			});
+
+			const result = await response.json();
+
+			if (!result.success) {
+				throw new Error(result.error || 'Failed to parse receipt');
+			}
+
+			const data: ParsedReceiptData = result.data;
+			
+			// Populate form with AI-extracted data
+			date = data.date;
+			description = data.description;
+			amount = data.amount?.toString() || "";
+			currency = data.currency;
+
+			// Move to review step
+			step = 'review';
+		} catch (e) {
+			error = e instanceof Error ? e.message : "Failed to analyze receipt";
+		} finally {
+			analyzing = false;
+		}
+	}
 
 	async function handleSubmit() {
 		if (!description || !date) {
@@ -36,6 +96,7 @@
 
 		submitting = true;
 		error = null;
+		step = 'saving';
 
 		try {
 			// Upload file to Supabase storage
@@ -66,80 +127,168 @@
 			goto(`/trips/${tripId}`);
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Failed to create receipt";
+			step = 'review';
 		} finally {
 			submitting = false;
 		}
 	}
+
+	function resetForm() {
+		step = 'upload';
+		file = null;
+		imagePreview = null;
+		date = new Date().toISOString().split('T')[0];
+		description = "";
+		amount = "";
+		currency = "USD";
+		error = null;
+	}
+
+	// Watch for file changes to create preview
+	$effect(() => {
+		if (file && file.type.startsWith('image/')) {
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				imagePreview = e.target?.result as string;
+			};
+			reader.readAsDataURL(file);
+		} else {
+			imagePreview = null;
+		}
+	});
 </script>
 
 <Card>
 	<CardHeader>
-		<CardTitle>Add Receipt</CardTitle>
+		<CardTitle>
+			{#if step === 'upload'}
+				Add Receipt - Upload
+			{:else if step === 'review'}
+				Add Receipt - Review & Edit
+			{:else}
+				Saving Receipt...
+			{/if}
+		</CardTitle>
 	</CardHeader>
 	<CardContent>
-		<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">
-			{#if error}
-				<div class="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-					{error}
-				</div>
-			{/if}
-
-			<div class="space-y-2">
-				<Label for="date">Date *</Label>
-				<Input
-					id="date"
-					type="date"
-					bind:value={date}
-					required
-				/>
+		{#if error}
+			<div class="p-3 text-sm text-destructive bg-destructive/10 rounded-md mb-4">
+				{error}
 			</div>
+		{/if}
 
-			<div class="space-y-2">
-				<Label for="description">Description *</Label>
-				<Textarea
-					id="description"
-					bind:value={description}
-					placeholder="What is this receipt for?"
-					rows={3}
-					required
-				/>
-			</div>
-
-			<div class="grid grid-cols-2 gap-4">
+		{#if step === 'upload'}
+			<div class="space-y-4">
 				<div class="space-y-2">
-					<Label for="amount">Amount</Label>
-					<Input
-						id="amount"
-						type="number"
-						step="0.01"
-						bind:value={amount}
-						placeholder="0.00"
-					/>
+					<Label>Receipt Image *</Label>
+					<FileUpload bind:file />
+					<p class="text-xs text-muted-foreground">
+						Upload a receipt image. Our AI will automatically extract the date, amount, and merchant information.
+					</p>
 				</div>
-				<div class="space-y-2">
-					<Label for="currency">Currency</Label>
-					<Input
-						id="currency"
-						bind:value={currency}
-						placeholder="USD"
-					/>
+
+				<div class="flex gap-2">
+					<Button 
+						onclick={analyzeReceipt} 
+						disabled={!file || analyzing}
+						class="w-full"
+					>
+						{analyzing ? "Analyzing Receipt..." : "Analyze Receipt with AI"}
+					</Button>
 				</div>
-			</div>
 
-			<div class="space-y-2">
-				<Label>Receipt File *</Label>
-				<FileUpload bind:file />
-			</div>
-
-			<div class="flex gap-2">
-				<Button type="submit" disabled={submitting}>
-					{submitting ? "Adding..." : "Add Receipt"}
-				</Button>
-				<Button type="button" variant="outline" onclick={() => goto(`/trips/${tripId}`)}>
+				<Button 
+					type="button" 
+					variant="outline" 
+					onclick={() => goto(`/trips/${tripId}`)}
+					class="w-full"
+				>
 					Cancel
 				</Button>
 			</div>
-		</form>
+		{:else if step === 'review'}
+			<div class="space-y-4">
+				{#if imagePreview}
+					<div class="space-y-2">
+						<Label>Receipt Preview</Label>
+						<img src={imagePreview} alt="Receipt" class="w-full max-h-64 object-contain rounded border" />
+					</div>
+				{/if}
+
+				<div class="space-y-2">
+					<Label for="date">Date *</Label>
+					<Input
+						id="date"
+						type="date"
+						bind:value={date}
+						required
+					/>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="description">Description *</Label>
+					<Textarea
+						id="description"
+						bind:value={description}
+						placeholder="Merchant name or description"
+						rows={3}
+						required
+					/>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="amount">Amount</Label>
+						<Input
+							id="amount"
+							type="number"
+							step="0.01"
+							bind:value={amount}
+							placeholder="0.00"
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="currency">Currency</Label>
+						<Input
+							id="currency"
+							bind:value={currency}
+							placeholder="USD"
+						/>
+					</div>
+				</div>
+
+				<div class="text-xs text-muted-foreground p-3 bg-muted/50 rounded">
+					Review the extracted information above. You can edit any field before saving.
+				</div>
+
+				<div class="flex gap-2">
+					<Button onclick={handleSubmit} disabled={submitting} class="flex-1">
+						{submitting ? "Saving..." : "Looks Good - Save Receipt"}
+					</Button>
+					<Button 
+						type="button" 
+						variant="outline" 
+						onclick={analyzeReceipt}
+						disabled={analyzing}
+					>
+						Re-analyze
+					</Button>
+				</div>
+
+				<Button 
+					type="button" 
+					variant="ghost" 
+					onclick={resetForm}
+					class="w-full"
+				>
+					Start Over
+				</Button>
+			</div>
+		{:else if step === 'saving'}
+			<div class="flex flex-col items-center justify-center py-8 space-y-4">
+				<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+				<p class="text-muted-foreground">Saving your receipt...</p>
+			</div>
+		{/if}
 	</CardContent>
 </Card>
-
