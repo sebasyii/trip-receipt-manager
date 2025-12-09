@@ -1,15 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
-import { createServerClient } from '$lib/utils/supabase.server';
 import { fail, redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ params, cookies }) => {
-	const supabase = createServerClient(cookies);
+export const load: PageServerLoad = async ({ params, locals }) => {
+	const supabase = locals.supabase;
 	const tripId = params.id;
 
 	// Verify the user is authenticated
-	const {
-		data: { user }
-	} = await supabase.auth.getUser();
+	const { user } = await locals.safeGetSession();
 
 	if (!user) {
 		throw redirect(303, '/login');

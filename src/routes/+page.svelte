@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TripList from '$lib/components/TripList.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { Spinner } from '$lib/components/ui/spinner';
 	import { goto } from '$app/navigation';
 
 	let { data } = $props();
@@ -12,11 +13,20 @@
 		<Button onclick={() => goto('/trips/new')}>New Trip</Button>
 	</div>
 
-	{#if data.error}
-		<div class="p-4 text-sm text-destructive bg-destructive/10 rounded-md mb-4">
-			{data.error}
+	{#await data.streamed.tripsData}
+		<div class="flex justify-center items-center py-12">
+			<Spinner size="lg" />
 		</div>
-	{/if}
-
-	<TripList trips={data.trips} />
+	{:then result}
+		{#if result.error}
+			<div class="p-4 text-sm text-destructive bg-destructive/10 rounded-md mb-4">
+				{result.error}
+			</div>
+		{/if}
+		<TripList trips={result.trips} />
+	{:catch error}
+		<div class="p-4 text-sm text-destructive bg-destructive/10 rounded-md mb-4">
+			Failed to load trips: {error.message}
+		</div>
+	{/await}
 </div>

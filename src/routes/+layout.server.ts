@@ -1,14 +1,10 @@
 import type { LayoutServerLoad } from './$types';
-import { createServerClient } from '$lib/utils/supabase.server';
 
-export const load: LayoutServerLoad = async ({ cookies }) => {
-	const supabase = createServerClient(cookies);
-
-	const {
-		data: { user }
-	} = await supabase.auth.getUser();
+export const load: LayoutServerLoad = async ({ locals }) => {
+	const { session, user } = await locals.safeGetSession();
 
 	return {
+		session,
 		user
 	};
 };

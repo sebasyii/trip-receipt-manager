@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import { Spinner } from '$lib/components/ui/spinner';
 	import ReceiptList from '$lib/components/ReceiptList.svelte';
 	import { formatDateShort } from '$lib/utils/date';
 	import { goto } from '$app/navigation';
@@ -37,13 +38,14 @@
 			</div>
 		</div>
 
-		{#if showDeleteConfirm}
+	{#if showDeleteConfirm}
+		{#await data.streamed.receipts then receipts}
 			<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
 				<div class="bg-background p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
 					<h2 class="text-xl font-bold mb-4">Delete Trip?</h2>
 					<p class="text-muted-foreground mb-6">
 						Are you sure you want to delete "{trip.name}"? This will also delete all
-						{trip.receipts?.length || 0} receipt(s) associated with this trip. This action cannot be
+						{receipts?.length || 0} receipt(s) associated with this trip. This action cannot be
 						undone.
 					</p>
 					<div class="flex gap-2 justify-end">
@@ -69,11 +71,22 @@
 					</div>
 				</div>
 			</div>
-		{/if}
+		{/await}
+	{/if}
 
-		<div>
-			<h2 class="text-2xl font-semibold mb-4">Receipts</h2>
-			<ReceiptList receipts={trip.receipts || []} />
-		</div>
+	<div>
+		<h2 class="text-2xl font-semibold mb-4">Receipts</h2>
+		{#await data.streamed.receipts}
+			<div class="flex justify-center items-center py-12">
+				<Spinner size="lg" />
+			</div>
+		{:then receipts}
+			<ReceiptList {receipts} />
+		{:catch error}
+			<div class="p-4 text-sm text-destructive bg-destructive/10 rounded-md">
+				Failed to load receipts: {error.message}
+			</div>
+		{/await}
+	</div>
 	</div>
 </div>

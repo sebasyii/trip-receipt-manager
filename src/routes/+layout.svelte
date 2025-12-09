@@ -3,10 +3,17 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { Button } from '$lib/components/ui/button';
 	import { goto, invalidateAll } from '$app/navigation';
+	import { navigating } from '$app/state';
 	import { page } from '$app/state';
-	import { supabase } from '$lib/utils/supabase';
+	import { setContext } from 'svelte';
+	import { createSupabaseBrowserClient } from '$lib/utils/supabase.browser';
+	import type { SupabaseClient } from '@supabase/supabase-js';
 
 	let { children, data } = $props();
+
+	// Create browser client and make it available via context
+	const supabase: SupabaseClient = createSupabaseBrowserClient();
+	setContext('supabase', supabase);
 
 	let loggingOut = $state(false);
 
@@ -15,7 +22,7 @@
 		try {
 			await supabase.auth.signOut();
 			await invalidateAll();
-			goto('/login');
+			await goto('/login');
 		} finally {
 			loggingOut = false;
 		}
@@ -30,12 +37,28 @@
 	<title>Trip Receipt Manager</title>
 </svelte:head>
 
+<!-- Global Loading Indicator -->
+{#if navigating}
+	<div class="fixed top-0 left-0 right-0 z-[100]">
+		<div class="h-1 bg-primary animate-pulse" style="animation: loading 1s ease-in-out infinite;">
+		</div>
+	</div>
+{/if}
+
+<style>
+	@keyframes loading {
+		0% { width: 0%; margin-left: 0%; }
+		50% { width: 50%; margin-left: 25%; }
+		100% { width: 100%; margin-left: 0%; }
+	}
+</style>
+
 {#if data.user && !isPublicPage}
 	<div class="min-h-screen flex flex-col">
 		<header class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
 			<div class="container mx-auto px-4 py-4 flex justify-between items-center">
 				<button
-					onclick={() => goto('/')}
+					onclick={async () => await goto('/')}
 					class="text-xl font-bold hover:opacity-80 transition-opacity"
 				>
 					Trip Receipt Manager

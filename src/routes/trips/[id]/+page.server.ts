@@ -1,22 +1,19 @@
 import type { Actions, PageServerLoad } from './$types';
-import { createServerClient } from '$lib/utils/supabase.server';
 import { error, redirect, fail } from '@sveltejs/kit';
 import type { Trip, Receipt, TripWithReceipts } from '$lib/types';
 
-export const load: PageServerLoad = async ({ params, cookies }) => {
-	const supabase = createServerClient(cookies);
+export const load: PageServerLoad = async ({ params, locals }) => {
+	const supabase = locals.supabase;
 	const tripId = params.id;
 
 	// Verify the user is authenticated
-	const {
-		data: { user }
-	} = await supabase.auth.getUser();
+	const { user } = await locals.safeGetSession();
 
 	if (!user) {
 		throw redirect(303, '/login');
 	}
 
-	// Fetch the trip
+	// Fetch the trip (await this - needed immediately for page header)
 	const { data: tripData, error: tripError } = await supabase
 		.from('trips')
 		.select('*')
@@ -28,35 +25,34 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		throw error(404, 'Trip not found');
 	}
 
-	// Fetch receipts for this trip
-	const { data: receiptsData, error: receiptsError } = await supabase
+	// Stream receipts - return promise without awaiting
+	const receiptsPromise = supabase
 		.from('receipts')
 		.select('*')
 		.eq('trip_id', tripId)
-		.order('date', { ascending: false });
-
-	if (receiptsError) {
-		console.error('Error loading receipts:', receiptsError);
-	}
-
-	const trip: TripWithReceipts = {
-		...(tripData as Trip),
-		receipts: (receiptsData ?? []) as Receipt[]
-	};
+		.order('date', { ascending: false })
+		.then(({ data, error: receiptsError }) => {
+			if (receiptsError) {
+				console.error('Error loading receipts:', receiptsError);
+				return [];
+			}
+			return (data ?? []) as Receipt[];
+		});
 
 	return {
-		trip
+		trip: tripData as Trip,
+		streamed: {
+			receipts: receiptsPromise
+		}
 	};
 };
 
 export const actions: Actions = {
-	delete: async ({ params, cookies }) => {
-		const supabase = createServerClient(cookies);
+	delete: async ({ params, locals }) => {
+		const supabase = locals.supabase;
 		const tripId = params.id;
 
-		const {
-			data: { user }
-		} = await supabase.auth.getUser();
+		const { user } = await locals.safeGetSession();
 
 		if (!user) {
 			throw redirect(303, '/login');

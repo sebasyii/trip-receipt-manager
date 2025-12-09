@@ -1,38 +1,34 @@
 import type { PageServerLoad } from './$types';
-import { createServerClient } from '$lib/utils/supabase.server';
 import { redirect } from '@sveltejs/kit';
 import type { Trip } from '$lib/types';
 
-export const load: PageServerLoad = async ({ cookies }) => {
-	const supabase = createServerClient(cookies);
+export const load: PageServerLoad = async ({ locals }) => {
+	const supabase = locals.supabase;
 
 	// Verify the user is authenticated
-	const {
-		data: { user }
-	} = await supabase.auth.getUser();
+	const { user } = await locals.safeGetSession();
 
 	if (!user) {
 		throw redirect(303, '/login');
 	}
 
-	// Fetch trips for the authenticated user
-	const { data: trips, error } = await supabase
+	// Stream trips - return promise without awaiting
+	const tripsPromise = supabase
 		.from('trips')
 		.select('*')
 		.eq('user_id', user.id)
-		.order('created_at', { ascending: false });
-
-	if (error) {
-		console.error('Error loading trips:', error);
-		return {
-			trips: [] as Trip[],
-			error: error.message
-		};
-	}
+		.order('created_at', { ascending: false })
+		.then(({ data, error }) => {
+			if (error) {
+				console.error('Error loading trips:', error);
+				return { trips: [] as Trip[], error: error.message };
+			}
+			return { trips: (data ?? []) as Trip[], error: null };
+		});
 
 	return {
-		trips: (trips ?? []) as Trip[]
+		streamed: {
+			tripsData: tripsPromise
+		}
 	};
 };
-
-export const ssr = false;

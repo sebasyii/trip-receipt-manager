@@ -28,7 +28,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					content: [
 						{
 							type: 'text',
-							text: `Analyze this receipt image and extract the following information. Return ONLY valid JSON with no additional text:
+							text: `Analyze this receipt image and extract the following information. Based on your knowledge, get the category and type of transaction based on the place and items purchased and put that in the description. Return ONLY valid JSON with no additional text:
 {
   "date": "YYYY-MM-DD format",
   "amount": number (total amount as a number),

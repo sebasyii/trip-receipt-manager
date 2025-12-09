@@ -5,9 +5,13 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
 	import FileUpload from './FileUpload.svelte';
-	import { supabase } from '$lib/utils/supabase';
+	import { getContext } from 'svelte';
+	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { ParsedReceiptData } from '$lib/types/receipt-parse';
+
+	// Get supabase client from context (set in +layout.svelte)
+	const supabase = getContext<SupabaseClient>('supabase');
 
 	interface Props {
 		tripId: string;
@@ -124,7 +128,7 @@
 
 			// Invalidate and navigate back
 			await invalidateAll();
-			goto(`/trips/${tripId}`);
+			await goto(`/trips/${tripId}`);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to create receipt';
 			step = 'review';
@@ -203,9 +207,9 @@
 						{analyzing ? 'Analyzing Receipt...' : 'Analyze with AI'}
 					</Button>
 
-					<Button type="button" variant="outline" onclick={() => goto(`/trips/${tripId}`)} class="w-full">
-						Cancel
-					</Button>
+				<Button type="button" variant="outline" onclick={async () => await goto(`/trips/${tripId}`)} class="w-full">
+					Cancel
+				</Button>
 				</div>
 			</div>
 		{:else if step === 'review'}
